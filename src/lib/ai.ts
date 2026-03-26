@@ -1,10 +1,11 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
-// Ensure API Key exists
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-if (!GEMINI_API_KEY && process.env.NODE_ENV === "production") {
-  console.warn("CRITICAL: GEMINI_API_KEY is missing from environment variables.");
+// HARD VALIDATION: Fail early if environment is misconfigured
+if (!process.env.GEMINI_API_KEY) {
+  throw new Error("CRITICAL FAILURE: Missing GEMINI_API_KEY in environment. Feature disabled until key is added to Vercel/local variables.");
 }
+
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 
 const genAI = new GoogleGenerativeAI(GEMINI_API_KEY || "");
 
