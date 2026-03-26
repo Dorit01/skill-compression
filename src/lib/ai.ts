@@ -1,72 +1,147 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
+// Ensure API Key exists
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+if (!GEMINI_API_KEY && process.env.NODE_ENV === "production") {
+  console.warn("CRITICAL: GEMINI_API_KEY is missing from environment variables.");
+}
 
+const genAI = new GoogleGenerativeAI(GEMINI_API_KEY || "");
+
+const PRIMARY_MODEL = "gemini-1.5-flash";
+const BACKUP_MODEL = "gemini-1.5-flash-latest";
+const MAX_RETRIES = 5;
+const REQUEST_TIMEOUT_MS = 30000; // 30 seconds
+
+/**
+ * Robust Skill Plan Generator
+ * Features: Exponential Backoff, Timeout Handling, Fallback Strategy, Detailed Logging
+ */
 export async function generateSkillPlan(skillName: string) {
+  if (!GEMINI_API_KEY) {
+    throw new Error("AI configuration error: Missing API Key. Please add GEMINI_API_KEY to your env variables.");
+  }
+
+  const prompt = `
+    You are an expert learning architect.
+    Generate a comprehensive skill compression learning plan for: "${skillName}".
+    
+    Respond only with a JSON object in this format:
+    {
+      "title": "Clear Skill Title",
+      "modules": [
+        {
+          "title": "Module Title",
+          "explanation": "Brief, high-impact explanation of the core concept",
+          "takeaway": "One-sentence actionable takeaway",
+          "exercise": "A concrete 5-minute exercise"
+        }
+      ]
+    }
+    Include exactly 5 modules. Keep explanations concise and high-impact.
+  `;
+
+  // Start with Primary Model
   try {
-    // Try the latest flash model first
-    const model = genAI.getGenerativeModel({
-      model: "gemini-1.5-flash",
-      generationConfig: {
-        responseMimeType: "application/json",
-      },
-    });
-
-    const prompt = `
-      You are an expert learning architect.
-      Generate a comprehensive skill compression learning plan for: "${skillName}".
-      
-      Respond only with a JSON object in this format:
-      {
-        "title": "Clear Skill Title",
-        "modules": [
-          {
-            "title": "Module Title",
-            "explanation": "Brief, high-impact explanation of the core concept",
-            "takeaway": "One-sentence actionable takeaway",
-            "exercise": "A concrete 5-minute exercise"
-          }
-        ]
-      }
-      Include exactly 5 modules. Keep explanations concise and high-impact.
-    `;
-
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    const text = response.text();
+    return await executeAiTask(PRIMARY_MODEL, prompt);
+  } catch (primaryError: any) {
+    console.warn(`Primary Model (${PRIMARY_MODEL}) failed. Attempting backup model. Error:`, primaryError.message);
     
-    return parseAIResponse(text);
-  } catch (error) {
-    console.error("Gemini Generation failed, trying fallback:", error);
-    
+    // Switch to Backup Model on failure
     try {
-      const fallbackModel = genAI.getGenerativeModel({ 
-        model: "gemini-1.5-flash-latest",
-        generationConfig: { responseMimeType: "application/json" }
+      return await executeAiTask(BACKUP_MODEL, `Generate a 5-module JSON learning plan for "${skillName}". Ensure you return ONLY valid RAW JSON matching the requested structure.`);
+    } catch (backupError: any) {
+      console.error("CRITICAL: All AI models failed.", {
+        primaryError: primaryError.message,
+        backupError: backupError.message
       });
-      const result = await fallbackModel.generateContent(`Generate a 5-module JSON learning plan for "${skillName}". Return ONLY raw JSON in the specified format: { "title": string, "modules": [{ "title": string, "explanation": string, "takeaway": string, "exercise": string }] }. Ensure everything is valid JSON.`);
-      return parseAIResponse(result.response.text());
-    } catch (fallbackError) {
-      console.error("AI Fallback failed:", fallbackError);
-      throw new Error("AI service temporarily unavailable. Please try again in a few minutes.");
+      throw new Error("AI service temporarily unavailable. We've encountered high traffic or a temporary outage. Please try again in 1-2 minutes.");
     }
   }
 }
 
+/**
+ * Low-level AI Task Executor with Retry & Timeout
+ */
+async function executeAiTask(modelName: string, prompt: string) {
+  const model = genAI.getGenerativeModel({
+    model: modelName,
+    generationConfig: {
+      responseMimeType: "application/json",
+      temperature: 0.7,
+      maxOutputTokens: 2048,
+    },
+  });
+
+  let lastError: Error | null = null;
+  
+  for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+    const delay = Math.pow(2, attempt) * 1000; // 1s, 2s, 4s, 8s, 16s
+    
+    if (attempt > 0) {
+      console.log(`Retry attempt ${attempt} for ${modelName} after ${delay}ms delay...`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+
+    try {
+      // Wrapper for timeout
+      const generateWithTimeout = async () => {
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error("REQUEST_TIMEOUT")), REQUEST_TIMEOUT_MS)
+        );
+        
+        const contentPromise = model.generateContent(prompt);
+        
+        return Promise.race([contentPromise, timeoutPromise]) as Promise<any>;
+      };
+
+      console.log(`Calling Gemini API (${modelName}) - Attempt ${attempt + 1}/${MAX_RETRIES}`);
+      const result = await generateWithTimeout();
+      const response = await result.response;
+      
+      if (!response) throw new Error("EMPTY_RESPONSE");
+      
+      const text = response.text();
+      if (!text) throw new Error("MALFORMED_RESPONSE_TEXT");
+
+      console.log(`Gemini API (${modelName}) Success!`);
+      return parseAIResponse(text);
+
+    } catch (error: any) {
+      lastError = error;
+      
+      // Handle specific error codes if available
+      const status = error?.status || error?.response?.status;
+      console.error(`AI Task Error [${modelName}] [Attempt ${attempt + 1}]:`, {
+        message: error.message,
+        status: status,
+        stack: error.stack?.split('\n')[0]
+      });
+
+      // Quick fail for permanent errors
+      if (status === 400 || status === 401 || status === 403) {
+        throw new Error(`AI Configuration Issue: ${error.message} (Status: ${status})`);
+      }
+
+      // If it's not a retryable error or max retries hit, loop will exit and throw later
+    }
+  }
+
+  throw lastError || new Error("MAX_RETRIES_REACHED");
+}
+
 function parseAIResponse(text: string) {
   try {
-    // Attempt to extract JSON from code blocks first
     const jsonMatch = text.match(/```json\s?([\s\S]*?)\s?```/) || text.match(/```\s?([\s\S]*?)\s?```/);
     const rawJson = jsonMatch ? jsonMatch[1] : text;
     
-    // Clean potential markdown or excess text
     const cleanedJson = rawJson.trim()
-      .replace(/^JSON/i, "") // Sometimes AI prefixes with "JSON"
+      .replace(/^JSON/i, "")
       .trim();
 
     return JSON.parse(cleanedJson);
   } catch (e) {
-    console.error("Failed to parse AI response:", text);
-    throw new Error("AI returned malformed data. Please try again.");
+    console.error("Failed to parse AI response into JSON:", text);
+    throw new Error("AI returned malformed data structure. Retrying or fallback might help.");
   }
 }
