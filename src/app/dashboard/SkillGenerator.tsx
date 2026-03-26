@@ -26,13 +26,15 @@ export default function SkillGenerator({ generationsRemaining }: { generationsRe
       const data = await res.json();
 
       if (!res.ok) {
-        setError(data.error || "Failed to generate skill");
+        console.error("DEBUG: Full Error Object Received:", data);
+        setError(`ERROR [Status ${data.status || res.status}]: ${data.error || "Internal Server Failure"}`);
       } else {
-        router.push(`/skills/${data.id}`);
+        router.push(`/skills/${data.data.id}`);
         router.refresh();
       }
     } catch (err: any) {
-      setError("An unexpected error occurred. Please check your connection.");
+      console.error("DEBUG: Unexpected Fetch Failure:", err);
+      setError(`Critical Connection Failure: ${err.message}`);
     } finally {
       setLoading(false);
     }

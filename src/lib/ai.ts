@@ -56,7 +56,8 @@ export async function generateSkillPlan(skillName: string) {
         primaryError: primaryError.message,
         backupError: backupError.message
       });
-      throw new Error("AI service temporarily unavailable. We've encountered high traffic or a temporary outage. Please try again in 1-2 minutes.");
+      // STOP MASKING: Throw the actual error from the backup model or combined message
+      throw new Error(`AI_MODELS_FAILED: [Primary] ${primaryError.message} | [Backup] ${backupError.message}`);
     }
   }
 }

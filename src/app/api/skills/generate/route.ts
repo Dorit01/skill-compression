@@ -48,18 +48,28 @@ export async function POST(req: Request) {
       }
     }
 
-    // Generate skill plan via AI (Structured as requested)
+    // Generate skill plan via AI (Structured for Debugging Visibility)
     let plan;
     try {
       plan = await generateSkillPlan(skillName);
       
       if (!plan || !plan.title || !Array.isArray(plan.modules)) {
-        console.error("AI API ERROR: Malformed plan received", plan);
-        return NextResponse.json({ error: "AI returned an incomplete plan structure" }, { status: 502 });
+        console.error("AI API ERROR (Malformed Plan):", plan);
+        return NextResponse.json({ 
+          success: false, 
+          error: "MALFORMED_AI_RESPONSE", 
+          debug: plan, 
+          status: 502 
+        }, { status: 502 });
       }
     } catch (aiErr: any) {
-      console.error("AI API ERROR:", aiErr);
-      return NextResponse.json({ error: aiErr.message || "AI Generation Failed" }, { status: 503 });
+      // Expose the raw AI error
+      console.error("DEBUG: REAL AI API ERROR:", aiErr);
+      return NextResponse.json({ 
+        success: false, 
+        error: aiErr.message || "AI_GENERATION_FAILED", 
+        status: aiErr.status || 503 
+      }, { status: aiErr.status || 503 });
     }
 
     // Save to DB
@@ -78,6 +88,9 @@ export async function POST(req: Request) {
         },
       },
       include: { modules: true },
+    }).catch(dbErr => {
+      console.error("SERVER ERROR (DB):", dbErr);
+      throw new Error(`DATABASE_SAVE_FAILURE: ${dbErr.message}`);
     });
 
     // Update generation count
@@ -86,9 +99,18 @@ export async function POST(req: Request) {
       data: { generationsCount: { increment: 1 } },
     });
 
-    return NextResponse.json(skill, { status: 200 });
+    return NextResponse.json({ 
+      success: true, 
+      data: skill 
+    }, { status: 200 });
+
   } catch (err: any) {
-    console.error("SERVER ERROR:", err);
-    return NextResponse.json({ error: err.message || "Internal server error" }, { status: 500 });
+    // Reveal everything
+    console.error("CRITICAL SERVER ERROR:", err);
+    return NextResponse.json({ 
+      success: false, 
+      error: err.message || "INTERNAL_SERVER_ERROR", 
+      status: 500 
+    }, { status: 500 });
   }
 }
