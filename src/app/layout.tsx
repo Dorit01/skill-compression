@@ -5,6 +5,7 @@ import Link from "next/link";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { AuthProvider } from "./AuthProvider";
+import { SignOutButton } from "@/components/SignOutButton";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -35,11 +36,7 @@ export default async function RootLayout({
                     <Link href="/dashboard" className="text-sm font-medium hover:text-blue-600 transition-colors">
                       Dashboard
                     </Link>
-                    <form action="/api/auth/signout" method="POST">
-                      <button type="submit" className="text-sm font-medium text-slate-600 hover:text-red-600 transition-colors">
-                        Logout
-                      </button>
-                    </form>
+                    <SignOutButton />
                   </>
                 ) : (
                   <>

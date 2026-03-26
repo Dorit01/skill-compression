@@ -44,21 +44,21 @@ export async function POST(req: Request) {
     // Generate skill plan via AI
     const plan = await generateSkillPlan(skillName);
 
-    if (!plan) {
-      return NextResponse.json({ error: "AI failed to generate a plan. Please try again." }, { status: 500 });
+    if (!plan || !plan.title || !Array.isArray(plan.modules)) {
+      return NextResponse.json({ error: "AI returned an incomplete plan. Please try again." }, { status: 500 });
     }
 
     // Save to DB
     const skill = await prisma.skill.create({
       data: {
         userId: session.user.id,
-        title: (plan as any).title,
+        title: plan.title,
         modules: {
-          create: (plan as any).modules.map((m: any, index: number) => ({
-            title: m.title,
-            explanation: m.explanation,
-            takeaway: m.takeaway,
-            exercise: m.exercise,
+          create: plan.modules.map((m: any, index: number) => ({
+            title: m.title || "Untitled Module",
+            explanation: m.explanation || "No explanation provided.",
+            takeaway: m.takeaway || "No takeaway provided.",
+            exercise: m.exercise || "No exercise provided.",
             order: index,
           })),
         },

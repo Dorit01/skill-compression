@@ -18,17 +18,21 @@
 }
 
 .card {
-  @apply bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden;
+  @apply bg-white/80 backdrop-blur-md border border-white/20 rounded-2xl shadow-sm overflow-hidden;
 }
 
 .btn-primary {
-  @apply px-6 py-3 bg-blue-600 text-white font-semibold rounded-xl hover:bg-blue-700 transition shadow-lg shadow-blue-200 active:scale-95 flex items-center justify-center gap-2;
+  @apply px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all duration-300 shadow-lg shadow-blue-200 active:scale-95 flex items-center justify-center gap-2;
 }
 
 .btn-secondary {
-  @apply px-6 py-3 border border-slate-200 text-slate-700 font-semibold rounded-xl hover:bg-slate-50 transition active:scale-95 flex items-center justify-center gap-2;
+  @apply px-6 py-3 border-2 border-slate-100 bg-white text-slate-700 font-bold rounded-xl hover:bg-slate-50 hover:border-blue-100 transition-all active:scale-95 flex items-center justify-center gap-2;
 }
 
 .input-field {
-  @apply w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition;
+  @apply w-full px-5 py-4 bg-slate-50/50 border-2 border-slate-100 rounded-2xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 focus:bg-white outline-none transition-all duration-300;
+}
+
+.glass-morphism {
+  @apply bg-white/70 backdrop-blur-xl border border-white/30 shadow-xl;
 }

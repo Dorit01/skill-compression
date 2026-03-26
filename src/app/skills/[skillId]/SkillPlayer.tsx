@@ -11,6 +11,11 @@ export default function SkillPlayer({ skill, activeIdx, userId }: { skill: any, 
   const [currentIdx, setCurrentIdx] = useState(activeIdx);
   const [completing, setCompleting] = useState(false);
   
+  if (!skill.modules || skill.modules.length === 0) {
+    router.push("/dashboard");
+    return null;
+  }
+
   const currentModule = skill.modules[currentIdx];
   const isCompleted = currentModule.progress.some((p: any) => p.userId === userId && p.completed);
   

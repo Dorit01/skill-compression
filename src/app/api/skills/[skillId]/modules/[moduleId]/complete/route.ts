@@ -43,23 +43,30 @@ export async function POST(
     const isPremium = user?.subscription?.status === "active";
 
     if (isPremium) {
-      // Schedule Spaced Repetition (1d, 3d, 7d)
-      const reviewDate1 = new Date();
-      reviewDate1.setDate(reviewDate1.getDate() + 1);
-
-      const reviewDate3 = new Date();
-      reviewDate3.setDate(reviewDate3.getDate() + 3);
-
-      const reviewDate7 = new Date();
-      reviewDate7.setDate(reviewDate7.getDate() + 7);
-
-      await prisma.reviewSchedule.createMany({
-        data: [
-          { userId: session.user.id, moduleId, scheduledFor: reviewDate1 },
-          { userId: session.user.id, moduleId, scheduledFor: reviewDate3 },
-          { userId: session.user.id, moduleId, scheduledFor: reviewDate7 },
-        ],
+      // Check if reviews already exist for this module to avoid duplicates
+      const existingReviews = await prisma.reviewSchedule.findFirst({
+        where: { userId: session.user.id, moduleId: moduleId },
       });
+
+      if (!existingReviews) {
+        // Schedule Spaced Repetition (1d, 3d, 7d)
+        const reviewDate1 = new Date();
+        reviewDate1.setDate(reviewDate1.getDate() + 1);
+
+        const reviewDate3 = new Date();
+        reviewDate3.setDate(reviewDate3.getDate() + 3);
+
+        const reviewDate7 = new Date();
+        reviewDate7.setDate(reviewDate7.getDate() + 7);
+
+        await prisma.reviewSchedule.createMany({
+          data: [
+            { userId: session.user.id, moduleId, scheduledFor: reviewDate1 },
+            { userId: session.user.id, moduleId, scheduledFor: reviewDate3 },
+            { userId: session.user.id, moduleId, scheduledFor: reviewDate7 },
+          ],
+        });
+      }
     }
 
     // Check if skill is completed
