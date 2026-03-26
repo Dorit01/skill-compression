@@ -11,7 +11,14 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { skillName } = await req.json();
+    let body;
+    try {
+      body = await req.json();
+    } catch (err) {
+      return NextResponse.json({ error: "Malformed JSON body" }, { status: 400 });
+    }
+
+    const { skillName } = body;
     if (!skillName) {
       return NextResponse.json({ error: "Skill name is required" }, { status: 400 });
     }
@@ -41,11 +48,18 @@ export async function POST(req: Request) {
       }
     }
 
-    // Generate skill plan via AI
-    const plan = await generateSkillPlan(skillName);
-
-    if (!plan || !plan.title || !Array.isArray(plan.modules)) {
-      return NextResponse.json({ error: "AI returned an incomplete plan. Please try again." }, { status: 500 });
+    // Generate skill plan via AI (Structured as requested)
+    let plan;
+    try {
+      plan = await generateSkillPlan(skillName);
+      
+      if (!plan || !plan.title || !Array.isArray(plan.modules)) {
+        console.error("AI API ERROR: Malformed plan received", plan);
+        return NextResponse.json({ error: "AI returned an incomplete plan structure" }, { status: 502 });
+      }
+    } catch (aiErr: any) {
+      console.error("AI API ERROR:", aiErr);
+      return NextResponse.json({ error: aiErr.message || "AI Generation Failed" }, { status: 503 });
     }
 
     // Save to DB
@@ -72,9 +86,9 @@ export async function POST(req: Request) {
       data: { generationsCount: { increment: 1 } },
     });
 
-    return NextResponse.json(skill);
-  } catch (error: any) {
-    console.error("Skill creation error:", error);
-    return NextResponse.json({ error: error.message || "Failed to create skill" }, { status: 500 });
+    return NextResponse.json(skill, { status: 200 });
+  } catch (err: any) {
+    console.error("SERVER ERROR:", err);
+    return NextResponse.json({ error: err.message || "Internal server error" }, { status: 500 });
   }
 }
