@@ -3,6 +3,7 @@ import { PrismaAdapter } from "@next-auth/prisma-adapter";
 import bcrypt from "bcrypt";
 import type { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
+import GoogleProvider from "next-auth/providers/google";
 
 declare module "next-auth" {
   interface Session {
@@ -10,6 +11,7 @@ declare module "next-auth" {
       id: string;
       email: string;
       name?: string | null;
+      image?: string | null;
     };
   }
 }
@@ -17,8 +19,15 @@ declare module "next-auth" {
 export const authOptions: NextAuthOptions = {
   // @ts-ignore
   adapter: PrismaAdapter(prisma),
-  session: { strategy: "jwt" },
+  session: { 
+    strategy: "jwt",
+    maxAge: 30 * 24 * 60 * 60, // 30 days
+  },
   providers: [
+    GoogleProvider({
+      clientId: process.env.GOOGLE_CLIENT_ID || "",
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET || "",
+    }),
     CredentialsProvider({
       name: "Credentials",
       credentials: {
@@ -34,7 +43,12 @@ export const authOptions: NextAuthOptions = {
           where: { email: credentials.email },
         });
 
-        if (!user || !(await bcrypt.compare(credentials.password, user.password))) {
+        // For Google users who try to sign in with credentials without a password
+        if (!user || !user.password) {
+          throw new Error("Invalid credentials");
+        }
+
+        if (!(await bcrypt.compare(credentials.password, user.password))) {
           throw new Error("Invalid credentials");
         }
 

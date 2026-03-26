@@ -94,11 +94,30 @@ export default function LoginPage() {
           >
             {loading ? <Loader2 className="animate-spin" /> : "Sign In"}
           </button>
+
+          <div className="relative py-4 flex items-center gap-4">
+            <div className="flex-1 h-px bg-slate-100" />
+            <span className="text-slate-400 text-xs font-bold uppercase tracking-widest whitespace-nowrap">Or continue via</span>
+            <div className="flex-1 h-px bg-slate-100" />
+          </div>
+
+          <button
+            type="button"
+            onClick={() => signIn("google", { callbackUrl: "/dashboard" })}
+            className="w-full flex items-center justify-center gap-3 bg-white border-2 border-slate-100 h-14 rounded-2xl font-bold hover:bg-slate-50 transition-all active:scale-[0.98] group"
+          >
+            <img 
+              src="https://www.google.com/favicon.ico" 
+              alt="Google" 
+              className="w-5 h-5 group-hover:scale-110 transition-transform" 
+            />
+            Continue with Google
+          </button>
         </form>
 
         <p className="mt-8 text-center text-slate-500">
           Don't have an account?{" "}
-          <Link href="/register" className="text-blue-600 font-bold hover:underline">
+          <Link href="/register" className="text-blue-600 font-bold hover:underline underline-offset-4 decoration-2">
             Join now
           </Link>
         </p>
