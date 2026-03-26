@@ -52,9 +52,9 @@ export async function POST(req: Request) {
     const skill = await prisma.skill.create({
       data: {
         userId: session.user.id,
-        title: plan.title,
+        title: (plan as any).title,
         modules: {
-          create: plan.modules.map((m, index) => ({
+          create: (plan as any).modules.map((m: any, index: number) => ({
             title: m.title,
             explanation: m.explanation,
             takeaway: m.takeaway,
